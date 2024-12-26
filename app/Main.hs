@@ -7,7 +7,7 @@ module Main (main) where
 
 import Data.Version
 import Text.ParserCombinators.ReadP
-import Data.List (unfoldr, dropWhileEnd, sort, groupBy, isPrefixOf)
+import Data.List (unfoldr, dropWhileEnd, sort, groupBy, isPrefixOf, intercalate)
 import Data.Char (isSpace)
 import Data.Function (on)
 import Data.Maybe (listToMaybe, catMaybes)
@@ -77,22 +77,22 @@ main = do
     -- print ps
     -- sequence_ $ print . showVersion <$> vs
     let bs = versionBranch <$> vs
-    putStrLn "\nSTEP-0"
-    sequence_ $ print <$> sort bs
-    let step1 = step bs
-    putStrLn "\nSTEP-1"
-    sequence_ $ print <$> step1
-    putStrLn "\nSTEP-2"
-    let step2 = fmap (fmap step) step1
-    sequence_ $ print <$> step2
-    putStrLn "\nSTEP-3"
-    let step3 = (fmap . fmap . fmap) (fmap step) step2
-    sequence_ $ print <$> step3
-    putStrLn "\nSTEP-4"
-    let step4 = (fmap . fmap . fmap . fmap . fmap) (fmap step) step3
-    sequence_ $ print <$> step4
+    -- putStrLn "\nSTEP-0"
+    -- sequence_ $ print <$> sort bs
+    -- let step1 = step bs
+    -- putStrLn "\nSTEP-1"
+    -- sequence_ $ print <$> step1
+    -- putStrLn "\nSTEP-2"
+    -- let step2 = fmap (fmap step) step1
+    -- sequence_ $ print <$> step2
+    -- putStrLn "\nSTEP-3"
+    -- let step3 = (fmap . fmap . fmap) (fmap step) step2
+    -- sequence_ $ print <$> step3
+    -- putStrLn "\nSTEP-4"
+    -- let step4 = (fmap . fmap . fmap . fmap . fmap) (fmap step) step3
+    -- sequence_ $ print <$> step4
     putStrLn "\nRENDER-0"
-    putStrLn $ ppr0 (sort bs) ""
+    putStrLn $ ppr0'' (sort bs)
 
 step :: [[Int]] -> [(Maybe Int, [[Int]])]
 step (sort -> bs) =
@@ -127,3 +127,25 @@ ppr0 (y : ys) =
 
 showVer :: [Int] -> ShowS
 showVer = showString . showVersion . makeVersion
+
+ppr0' :: [[Int]] -> ShowS
+ppr0' vs = 
+    foldr (\x y -> x . showString ", " . y) (showString "\n") ys
+    where
+        ys :: [ShowS]
+        ys = [ showVer v | v <- vs ]
+
+ppr0'' :: [[Int]] -> String
+ppr0'' vs = fst $
+    foldl'
+        (\(acc, (carry, depth)) (_x, y) ->
+            if null acc
+                then (showVer y "", (carry, depth))
+                else (acc ++ ", " ++ showVer y "", (carry, depth)))
+        ("", ([], 0))
+        ys
+    where
+        ys :: [([Int], [Int])]
+        ys = zip ([] : vs) vs
+
+-- partialPpr :: [Int] -> [Int] -> (String, [Int])
