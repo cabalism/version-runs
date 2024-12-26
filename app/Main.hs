@@ -6,6 +6,8 @@
 
 module Main (main) where
 
+import Prelude hiding ((<>))
+
 import Data.Version
 import Data.Coerce
 import Text.ParserCombinators.ReadP
@@ -15,6 +17,7 @@ import Data.Function (on)
 import Data.Maybe (listToMaybe, catMaybes)
 import Data.Functor ((<&>))
 import GHC.Read (list)
+import Text.PrettyPrint.HughesPJClass
 
 vsPandoc :: String
 vsPandoc =
@@ -79,8 +82,10 @@ main = do
     -- print ps
     -- sequence_ $ print . showVersion <$> vs
     let bs :: [RawV0] = versionBranch <$> vs
+    let v0 = mkV0 bs
     putStrLn "\nSTEP-0"
     sequence_ $ print <$> sort bs
+    putStrLn . render $ pPrint v0
     let step1 :: [(Maybe Int, [RawV0])] = step bs
     putStrLn "\nSTEP-1"
     sequence_ $ print <$> step1
@@ -129,3 +134,11 @@ data V2 = V2 { v2 :: Maybe Int, w2 :: [V1] }
 -- | Second group of versions.
 data V3 = V3 { v3 :: Maybe Int, w3 :: [V2] }
     deriving (Show)
+
+mkV0 :: [RawV0] -> V0
+mkV0 = V0 . sort
+
+instance Pretty V0 where
+    pPrint (V0 []) = empty
+    pPrint (V0 [x]) = text $ showVer x ""
+    pPrint (V0 (x:xs)) = text (showVer x "") <> comma <+> pPrint (V0 xs)
