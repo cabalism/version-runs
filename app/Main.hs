@@ -7,6 +7,7 @@
 module Main (main) where
 
 import Data.Version
+import Data.Coerce
 import Text.ParserCombinators.ReadP
 import Data.List (unfoldr, dropWhileEnd, sort, groupBy, isPrefixOf, intercalate)
 import Data.Char (isSpace)
@@ -77,23 +78,21 @@ main = do
     let vs  = parseVer . trim <$> ps
     -- print ps
     -- sequence_ $ print . showVersion <$> vs
-    let bs = versionBranch <$> vs
-    -- putStrLn "\nSTEP-0"
-    -- sequence_ $ print <$> sort bs
-    -- let step1 = step bs
-    -- putStrLn "\nSTEP-1"
-    -- sequence_ $ print <$> step1
-    -- putStrLn "\nSTEP-2"
-    -- let step2 = fmap (fmap step) step1
-    -- sequence_ $ print <$> step2
-    -- putStrLn "\nSTEP-3"
-    -- let step3 = (fmap . fmap . fmap) (fmap step) step2
-    -- sequence_ $ print <$> step3
-    -- putStrLn "\nSTEP-4"
-    -- let step4 = (fmap . fmap . fmap . fmap . fmap) (fmap step) step3
-    -- sequence_ $ print <$> step4
-    putStrLn "\nRENDER-0"
-    putStrLn $ ppr0'' (sort bs)
+    let bs :: [RawV0] = versionBranch <$> vs
+    putStrLn "\nSTEP-0"
+    sequence_ $ print <$> sort bs
+    let step1 :: [(Maybe Int, [RawV0])] = step bs
+    putStrLn "\nSTEP-1"
+    sequence_ $ print <$> step1
+    putStrLn "\nSTEP-2"
+    let step2 :: [(Maybe Int, [(Maybe Int, [RawV0])])] = fmap (fmap step) step1
+    sequence_ $ print <$> step2
+    putStrLn "\nSTEP-3"
+    let step3 :: [(Maybe Int, [(Maybe Int, [(Maybe Int, [RawV0])])])] = (fmap . fmap . fmap) (fmap step) step2
+    sequence_ $ print <$> step3
+    putStrLn "\nSTEP-4"
+    let step4 = (fmap . fmap . fmap . fmap . fmap) (fmap step) step3
+    sequence_ $ print <$> step4
 
 step :: [[Int]] -> [(Maybe Int, [[Int]])]
 step (sort -> bs) =
@@ -110,47 +109,23 @@ assoc xs =
     where
         (vs, ws) = unzip [(x, ys) | (Just x, ys) <- xs]
 
-ppr0 :: [[Int]] -> ShowS
-ppr0 [] = showString "; []\n"
-ppr0 [y] = showString "; " . showVer y . showChar '\n'
-ppr0 (y : ys) =
-        showString "; "
-        . showVer y
-        . foldr
-            (\e m ->
-                let content =
-                        if m "" `isPrefixOf` showVer e ""
-                            then showVer e . m
-                            else showVer e . showChar '.' . m
-                in showChar '\n' . showString "; " . content)
-            (showString "\n")
-            ys
-
 showVer :: [Int] -> ShowS
 showVer = showString . showVersion . makeVersion
 
-ppr0' :: [[Int]] -> ShowS
-ppr0' vs = 
-    foldr (\x y -> x . showString ", " . y) (showString "\n") ys
-    where
-        ys :: [ShowS]
-        ys = [ showVer v | v <- vs ]
+type RawV0 = [Int]
 
-ppr0'' :: [[Int]] -> String
-ppr0'' vs = fst $
-    foldl'
-        (\(acc, (carry, depth)) (x, y) ->
-            if | null acc -> (showVer y "", (y, 0))
-               | null carry ->
-                    if take (depth + 1) x == take (depth + 1) y
-                        then (acc ++ "." ++ showVer y "", (y, depth + 1))
-                        else (acc ++ ", " ++ showVer y "", (y, 0))
-                | otherwise ->
-                    (acc ++ ", " ++ showVer y "", (carry, depth)))
-        ("", ([], 0))
-        ys
-    where
-        ys :: [([Int], [Int])]
-        ys = zip ([] : vs) vs
+-- | Raw versions.
+newtype V0 = V0 { w0 :: [RawV0] }
+    deriving (Show)
 
--- partialPpr :: [Int] -> [Int] -> (String, [Int])
+-- | First group of versions.
+data V1 = V1 { v1 :: Maybe Int, w1 :: [V0] }
+    deriving (Show)
+
+-- | Second group of versions.
+data V2 = V2 { v2 :: Maybe Int, w2 :: [V1] }
+    deriving (Show)
+
+-- | Second group of versions.
+data V3 = V3 { v3 :: Maybe Int, w3 :: [V2] }
+    deriving (Show)
