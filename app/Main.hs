@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TupleSections #-}
 
 module Main (main) where
 
@@ -81,36 +82,46 @@ main = do
     let vs  = parseVer . trim <$> ps
     -- print ps
     -- sequence_ $ print . showVersion <$> vs
-    let bs :: [V0] = versionBranch <$> vs
-    let v0 = mkV0 bs
+
     putStrLn "\nSTEP-0"
+    let bs :: [V0] = versionBranch <$> vs
     sequence_ $ print <$> sort bs
+
     putStrLn "\nV-0"
+    let v0 = mkV0 bs
     putStrLn . render $ pPrint v0
 
-    let step1 :: [(Maybe Int, [V0])] = step bs
-    let v1s = V1s $ mkV1 <$> step1
     putStrLn "\nSTEP-1"
+    let step1 :: [(Maybe Int, [V0])] = mkStep bs
     sequence_ $ print <$> step1
+
+    putStrLn "\nV-1'"
+    let v1s' = V1s $ mkV1 <$> step1
+    putStrLn . render $ pPrint v1s'
     putStrLn "\nV-1"
+    let v1s = V1s $ mkVerStep bs
     putStrLn . render $ pPrint v1s
 
     putStrLn "\nSTEP-2"
-    let step2 :: [(Maybe Int, [(Maybe Int, [V0])])] = fmap (fmap step) step1
-    let v2s = V2s $ mkV2 <$> step2
+    let step2 :: [(Maybe Int, [(Maybe Int, [V0])])] = fmap (fmap mkStep) step1
     sequence_ $ print <$> step2
+
     putStrLn "\nV-2"
-    putStrLn . render $ pPrint v2s
 
     putStrLn "\nSTEP-3"
-    let step3 :: [(Maybe Int, [(Maybe Int, [(Maybe Int, [V0])])])] = (fmap . fmap . fmap) (fmap step) step2
+    let step3 :: [(Maybe Int, [(Maybe Int, [(Maybe Int, [V0])])])] = (fmap . fmap . fmap) (fmap mkStep) step2
     sequence_ $ print <$> step3
     putStrLn "\nSTEP-4"
-    let step4 = (fmap . fmap . fmap . fmap . fmap) (fmap step) step3
+    let step4 = (fmap . fmap . fmap . fmap . fmap) (fmap mkStep) step3
     sequence_ $ print <$> step4
 
-step :: [[Int]] -> [(Maybe Int, [V0])]
-step (sort -> bs) =
+-- >>> mkStep [[0,4],[0,41],[0,42]]
+-- [(Just 0,[[4],[41],[42]])]
+--
+-- >>> mkStep [[3,0,1],[3,1],[3,1,1],[3,1,2],[3,1,3],[3,1,4],[3,1,5],[3,1,6],[3,1,6,1],[3,1,6,2],[3,1,7],[3,1,8]]
+-- [(Just 3,[[0,1],[1],[1,1],[1,2],[1,3],[1,4],[1,5],[1,6],[1,6,1],[1,6,2],[1,7],[1,8]])]
+mkStep :: [V0] -> [(Maybe Int, [V0])]
+mkStep (sort -> bs) =
     filter (\case
         (Nothing, []) -> False
         _ -> True
@@ -123,6 +134,14 @@ assoc xs =
     (listToMaybe vs, sort ws)
     where
         (vs, ws) = unzip [(x, ys) | (Just x, ys) <- xs]
+
+
+mkVerStep :: [V0] -> [V1]
+mkVerStep =
+    (\xs ->
+        [ V1 i [V0s ys] | (i@(Just _), ys) <- xs]
+        )
+    . mkStep
 
 showVer :: [Int] -> ShowS
 showVer = showString . showVersion . makeVersion
@@ -156,9 +175,6 @@ mkV0 = V0s . sort
 
 mkV1 :: (Maybe Int, [V0]) -> V1
 mkV1 (v, vs) = V1 v $ [mkV0 $ filter (not . null) vs]
-
-mkV2 :: (Maybe Int, [(Maybe Int, [V0])]) -> V2
-mkV2 (v, vs) = V2 v (mkV1 <$> vs)
 
 -- >>> pPrint $ V0s [[0,4],[0,41],[0,42]]
 -- 0.4, 0.41, 0.42
