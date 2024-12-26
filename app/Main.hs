@@ -81,32 +81,35 @@ main = do
     let vs  = parseVer . trim <$> ps
     -- print ps
     -- sequence_ $ print . showVersion <$> vs
-    let bs :: [RawV0] = versionBranch <$> vs
+    let bs :: [V0] = versionBranch <$> vs
     let v0 = mkV0 bs
     putStrLn "\nSTEP-0"
     sequence_ $ print <$> sort bs
+    putStrLn "\nV-0"
     putStrLn . render $ pPrint v0
 
-    let step1 :: [(Maybe Int, [RawV0])] = step bs
+    let step1 :: [(Maybe Int, [V0])] = step bs
     let v1s = V1s $ mkV1 <$> step1
     putStrLn "\nSTEP-1"
     sequence_ $ print <$> step1
+    putStrLn "\nV-1"
     putStrLn . render $ pPrint v1s
 
     putStrLn "\nSTEP-2"
-    let step2 :: [(Maybe Int, [(Maybe Int, [RawV0])])] = fmap (fmap step) step1
+    let step2 :: [(Maybe Int, [(Maybe Int, [V0])])] = fmap (fmap step) step1
     let v2s = V2s $ mkV2 <$> step2
     sequence_ $ print <$> step2
+    putStrLn "\nV-2"
     putStrLn . render $ pPrint v2s
 
     putStrLn "\nSTEP-3"
-    let step3 :: [(Maybe Int, [(Maybe Int, [(Maybe Int, [RawV0])])])] = (fmap . fmap . fmap) (fmap step) step2
+    let step3 :: [(Maybe Int, [(Maybe Int, [(Maybe Int, [V0])])])] = (fmap . fmap . fmap) (fmap step) step2
     sequence_ $ print <$> step3
     putStrLn "\nSTEP-4"
     let step4 = (fmap . fmap . fmap . fmap . fmap) (fmap step) step3
     sequence_ $ print <$> step4
 
-step :: [[Int]] -> [(Maybe Int, [[Int]])]
+step :: [[Int]] -> [(Maybe Int, [V0])]
 step (sort -> bs) =
     filter (\case
         (Nothing, []) -> False
@@ -115,7 +118,7 @@ step (sort -> bs) =
     (fmap assoc) <$>
     groupBy ((==) `on` fst) $ (\vs -> (listToMaybe vs, drop 1 vs)) <$> bs
 
-assoc :: [(Maybe Int, [Int])] -> (Maybe Int, [[Int]])
+assoc :: [(Maybe Int, [Int])] -> (Maybe Int, [V0])
 assoc xs =
     (listToMaybe vs, sort ws)
     where
@@ -124,14 +127,14 @@ assoc xs =
 showVer :: [Int] -> ShowS
 showVer = showString . showVersion . makeVersion
 
-type RawV0 = [Int]
-
 -- | Raw versions.
-newtype V0 = V0 { w0 :: [RawV0] }
+type V0 = [Int]
+
+newtype V0s = V0s [V0]
     deriving (Show)
 
 -- | First group of versions.
-data V1 = V1 { v1 :: Maybe Int, w1 :: [V0] }
+data V1 = V1 { v1 :: Maybe Int, w1 :: [V0s] }
     deriving (Show)
 
 newtype V1s = V1s [V1]
@@ -148,21 +151,21 @@ newtype V2s = V2s [V2]
 data V3 = V3 { v3 :: Maybe Int, w3 :: [V2] }
     deriving (Show)
 
-mkV0 :: [RawV0] -> V0
-mkV0 = V0 . sort
+mkV0 :: [V0] -> V0s
+mkV0 = V0s . sort
 
-mkV1 :: (Maybe Int, [RawV0]) -> V1
+mkV1 :: (Maybe Int, [V0]) -> V1
 mkV1 (v, vs) = V1 v $ [mkV0 $ filter (not . null) vs]
 
-mkV2 :: (Maybe Int, [(Maybe Int, [RawV0])]) -> V2
+mkV2 :: (Maybe Int, [(Maybe Int, [V0])]) -> V2
 mkV2 (v, vs) = V2 v (mkV1 <$> vs)
 
 -- >>> pPrint $ V0 [[0,4],[0,41],[0,42]]
 -- 0.4, 0.41, 0.42
-instance Pretty V0 where
-    pPrint (V0 []) = empty
-    pPrint (V0 [x]) = text $ showVer x ""
-    pPrint (V0 (x:xs)) = text (showVer x "") <> comma <+> pPrint (V0 xs)
+instance Pretty V0s where
+    pPrint (V0s []) = empty
+    pPrint (V0s [x]) = text $ showVer x ""
+    pPrint (V0s (x:xs)) = text (showVer x "") <> comma <+> pPrint (V0s xs)
 
 -- >>> mkV1 $ (Just 0,[[4],[41],[42]])
 -- V1 {v1 = Just 0, w1 = [V0 {w0 = [[4],[41],[42]]}]}
@@ -171,7 +174,6 @@ instance Pretty V0 where
 -- 0.[4, 41, 42]
 instance Pretty V1 where
     pPrint (V1 v0 []) = maybe empty (text . show) v0
-    pPrint (V1 v0 [V0 []]) = maybe empty (text . show) v0
     pPrint (V1 v0 vs) = maybe empty (\v -> text (show v) <> text ".") v0 <> pPrint vs
 
 -- >>> pPrint $ V1s [V1 (Just 0) [V0 [[4],[41],[42]]]]
