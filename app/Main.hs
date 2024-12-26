@@ -160,7 +160,7 @@ mkV1 (v, vs) = V1 v $ [mkV0 $ filter (not . null) vs]
 mkV2 :: (Maybe Int, [(Maybe Int, [V0])]) -> V2
 mkV2 (v, vs) = V2 v (mkV1 <$> vs)
 
--- >>> pPrint $ V0 [[0,4],[0,41],[0,42]]
+-- >>> pPrint $ V0s [[0,4],[0,41],[0,42]]
 -- 0.4, 0.41, 0.42
 instance Pretty V0s where
     pPrint (V0s []) = empty
@@ -168,15 +168,15 @@ instance Pretty V0s where
     pPrint (V0s (x:xs)) = text (showVer x "") <> comma <+> pPrint (V0s xs)
 
 -- >>> mkV1 $ (Just 0,[[4],[41],[42]])
--- V1 {v1 = Just 0, w1 = [V0 {w0 = [[4],[41],[42]]}]}
+-- V1 {v1 = Just 0, w1 = [V0s [[4],[41],[42]]]}
 --
--- >>> pPrint $ V1 (Just 0) [V0 [[4],[41],[42]]]
+-- >>> pPrint $ V1 (Just 0) [V0s [[4],[41],[42]]]
 -- 0.[4, 41, 42]
 instance Pretty V1 where
     pPrint (V1 v0 []) = maybe empty (text . show) v0
     pPrint (V1 v0 vs) = maybe empty (\v -> text (show v) <> text ".") v0 <> pPrint vs
 
--- >>> pPrint $ V1s [V1 (Just 0) [V0 [[4],[41],[42]]]]
+-- >>> pPrint $ V1s [V1 (Just 0) [V0s [[4],[41],[42]]]]
 -- 0.[4, 41, 42]
 instance Pretty V1s where
     pPrint (V1s []) = empty
@@ -185,14 +185,17 @@ instance Pretty V1s where
     pPrint (V1s (x:xs)) = pPrint x <> comma <+> pPrint (V1s xs)
 
 -- >>> mkV2 (Just 0,[(Just 4,[[]]),(Just 41,[[]]),(Just 42,[[]])])
--- V2 {v2 = Just 0, w2 = [V1 {v1 = Just 4, w1 = [V0 {w0 = []}]},V1 {v1 = Just 41, w1 = [V0 {w0 = []}]},V1 {v1 = Just 42, w1 = [V0 {w0 = []}]}]}
+-- V2 {v2 = Just 0, w2 = [V1 {v1 = Just 4, w1 = [V0s []]},V1 {v1 = Just 41, w1 = [V0s []]},V1 {v1 = Just 42, w1 = [V0s []]}]}
 --
--- >>> pPrint $ V2 (Just 0) [V1 (Just 4) [V0 []], V1 (Just 41) [V0 []], V1 (Just 42) [V0 []]]
--- 0.[4, 41, 42]
+-- >>> pPrint $ V2 (Just 0) [V1 (Just 4) [], V1 (Just 41) [], V1 (Just 43) []]
+-- 0.4, 41, Just 43
+--
+-- >>> pPrint $ V2 (Just 0) [V1 (Just 4) [V0s []], V1 (Just 41) [V0s []], V1 (Just 42) [V0s []]]
+-- 0.4.[], 41.[], 42.[]
 instance Pretty V2 where
-    pPrint (V2 v0 []) = maybe empty (text . show) v0
-    pPrint (V2 v0 [V1 _ []]) = maybe empty (text . show) v0
-    pPrint (V2 v0 vs) = maybe empty (\v -> text (show v) <> text ".") v0 <> pPrint (V1s vs)
+    pPrint (V2 v []) = maybe empty (text . show) v
+    pPrint (V2 v [V1 v' []]) = maybe empty (text . show) v <> text "." <> pPrint v'
+    pPrint (V2 v vs) = maybe empty (\ver -> text (show ver) <> text ".") v <> pPrint (V1s vs)
 
 instance Pretty V2s where
     pPrint (V2s []) = empty
