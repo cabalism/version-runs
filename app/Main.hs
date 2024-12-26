@@ -86,9 +86,13 @@ main = do
     putStrLn "\nSTEP-0"
     sequence_ $ print <$> sort bs
     putStrLn . render $ pPrint v0
+
     let step1 :: [(Maybe Int, [RawV0])] = step bs
+    let v1 = mkV1 <$> step1
     putStrLn "\nSTEP-1"
     sequence_ $ print <$> step1
+    putStrLn . render $ pPrint v1
+
     putStrLn "\nSTEP-2"
     let step2 :: [(Maybe Int, [(Maybe Int, [RawV0])])] = fmap (fmap step) step1
     sequence_ $ print <$> step2
@@ -127,6 +131,9 @@ newtype V0 = V0 { w0 :: [RawV0] }
 data V1 = V1 { v1 :: Maybe Int, w1 :: [V0] }
     deriving (Show)
 
+newtype V1s = V1s [V1]
+    deriving (Show)
+
 -- | Second group of versions.
 data V2 = V2 { v2 :: Maybe Int, w2 :: [V1] }
     deriving (Show)
@@ -138,7 +145,18 @@ data V3 = V3 { v3 :: Maybe Int, w3 :: [V2] }
 mkV0 :: [RawV0] -> V0
 mkV0 = V0 . sort
 
+mkV1 :: (Maybe Int, [RawV0]) -> V1
+mkV1 (v, vs) = V1 v [mkV0 vs]
+
 instance Pretty V0 where
     pPrint (V0 []) = empty
     pPrint (V0 [x]) = text $ showVer x ""
     pPrint (V0 (x:xs)) = text (showVer x "") <> comma <+> pPrint (V0 xs)
+
+instance Pretty V1 where
+    pPrint (V1 v0 vs) = maybe empty (\v -> text (show v) <> text ".") v0 <> pPrint vs
+
+instance Pretty V1s where
+    pPrint (V1s []) = empty
+    pPrint (V1s [x]) = pPrint x
+    pPrint (V1s (x:xs)) = pPrint x <> comma <+> pPrint (V1s xs)
