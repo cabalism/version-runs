@@ -88,14 +88,17 @@ main = do
     putStrLn . render $ pPrint v0
 
     let step1 :: [(Maybe Int, [RawV0])] = step bs
-    let v1 = mkV1 <$> step1
+    let v1s = V1s $ mkV1 <$> step1
     putStrLn "\nSTEP-1"
     sequence_ $ print <$> step1
-    putStrLn . render $ pPrint v1
+    putStrLn . render $ pPrint v1s
 
     putStrLn "\nSTEP-2"
     let step2 :: [(Maybe Int, [(Maybe Int, [RawV0])])] = fmap (fmap step) step1
+    let v2s = V2s $ mkV2 <$> step2
     sequence_ $ print <$> step2
+    putStrLn . render $ pPrint v2s
+
     putStrLn "\nSTEP-3"
     let step3 :: [(Maybe Int, [(Maybe Int, [(Maybe Int, [RawV0])])])] = (fmap . fmap . fmap) (fmap step) step2
     sequence_ $ print <$> step3
@@ -138,6 +141,9 @@ newtype V1s = V1s [V1]
 data V2 = V2 { v2 :: Maybe Int, w2 :: [V1] }
     deriving (Show)
 
+newtype V2s = V2s [V2]
+    deriving (Show)
+
 -- | Second group of versions.
 data V3 = V3 { v3 :: Maybe Int, w3 :: [V2] }
     deriving (Show)
@@ -146,17 +152,48 @@ mkV0 :: [RawV0] -> V0
 mkV0 = V0 . sort
 
 mkV1 :: (Maybe Int, [RawV0]) -> V1
-mkV1 (v, vs) = V1 v [mkV0 vs]
+mkV1 (v, vs) = V1 v $ [mkV0 $ filter (not . null) vs]
 
+mkV2 :: (Maybe Int, [(Maybe Int, [RawV0])]) -> V2
+mkV2 (v, vs) = V2 v (mkV1 <$> vs)
+
+-- >>> pPrint $ V0 [[0,4],[0,41],[0,42]]
+-- 0.4, 0.41, 0.42
 instance Pretty V0 where
     pPrint (V0 []) = empty
     pPrint (V0 [x]) = text $ showVer x ""
     pPrint (V0 (x:xs)) = text (showVer x "") <> comma <+> pPrint (V0 xs)
 
+-- >>> mkV1 $ (Just 0,[[4],[41],[42]])
+-- V1 {v1 = Just 0, w1 = [V0 {w0 = [[4],[41],[42]]}]}
+--
+-- >>> pPrint $ V1 (Just 0) [V0 [[4],[41],[42]]]
+-- 0.[4, 41, 42]
 instance Pretty V1 where
+    pPrint (V1 v0 []) = maybe empty (text . show) v0
+    pPrint (V1 v0 [V0 []]) = maybe empty (text . show) v0
     pPrint (V1 v0 vs) = maybe empty (\v -> text (show v) <> text ".") v0 <> pPrint vs
 
+-- >>> pPrint $ V1s [V1 (Just 0) [V0 [[4],[41],[42]]]]
+-- 0.[4, 41, 42]
 instance Pretty V1s where
     pPrint (V1s []) = empty
+    pPrint (V1s [V1 x []]) = pPrint x
     pPrint (V1s [x]) = pPrint x
     pPrint (V1s (x:xs)) = pPrint x <> comma <+> pPrint (V1s xs)
+
+-- >>> mkV2 (Just 0,[(Just 4,[[]]),(Just 41,[[]]),(Just 42,[[]])])
+-- V2 {v2 = Just 0, w2 = [V1 {v1 = Just 4, w1 = [V0 {w0 = []}]},V1 {v1 = Just 41, w1 = [V0 {w0 = []}]},V1 {v1 = Just 42, w1 = [V0 {w0 = []}]}]}
+--
+-- >>> pPrint $ V2 (Just 0) [V1 (Just 4) [V0 []], V1 (Just 41) [V0 []], V1 (Just 42) [V0 []]]
+-- 0.[4, 41, 42]
+instance Pretty V2 where
+    pPrint (V2 v0 []) = maybe empty (text . show) v0
+    pPrint (V2 v0 [V1 _ []]) = maybe empty (text . show) v0
+    pPrint (V2 v0 vs) = maybe empty (\v -> text (show v) <> text ".") v0 <> pPrint (V1s vs)
+
+instance Pretty V2s where
+    pPrint (V2s []) = empty
+    pPrint (V2s [V2 x []]) = pPrint x
+    pPrint (V2s [x]) = pPrint x
+    pPrint (V2s (x:xs)) = pPrint x <> comma <+> pPrint (V2s xs)
