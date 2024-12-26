@@ -2,6 +2,7 @@
 {-# LANGUAGE ParallelListComp #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Main (main) where
 
@@ -138,10 +139,14 @@ ppr0' vs =
 ppr0'' :: [[Int]] -> String
 ppr0'' vs = fst $
     foldl'
-        (\(acc, (carry, depth)) (_x, y) ->
-            if null acc
-                then (showVer y "", (carry, depth))
-                else (acc ++ ", " ++ showVer y "", (carry, depth)))
+        (\(acc, (carry, depth)) (x, y) ->
+            if | null acc -> (showVer y "", (y, 0))
+               | null carry ->
+                    if take (depth + 1) x == take (depth + 1) y
+                        then (acc ++ "." ++ showVer y "", (y, depth + 1))
+                        else (acc ++ ", " ++ showVer y "", (y, 0))
+                | otherwise ->
+                    (acc ++ ", " ++ showVer y "", (carry, depth)))
         ("", ([], 0))
         ys
     where
