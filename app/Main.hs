@@ -91,29 +91,33 @@ main = do
     let v0 = mkV0 bs
     putStrLn . render $ pPrint v0
 
-    putStrLn "\nSTEP-1"
-    let step1 :: [(Maybe Int, [V0])] = mkStep bs
-    sequence_ $ print <$> step1
+    -- putStrLn "\nSTEP-1"
+    -- let step1 :: [(Maybe Int, [V0])] = mkStep bs
+    -- sequence_ $ print <$> step1
 
-    putStrLn "\nV-1'"
-    let v1s' = V1s $ mkV1 <$> step1
-    putStrLn . render $ pPrint v1s'
+    -- putStrLn "\nV-1'"
+    -- let v1s' = V1s $ mkV1 <$> step1
+    -- putStrLn . render $ pPrint v1s'
+
     putStrLn "\nV-1"
-    let v1s = V1s $ mkVerStep bs
+    let v1s = V1s $ mkVerStep (V0s bs)
     putStrLn . render $ pPrint v1s
 
-    putStrLn "\nSTEP-2"
-    let step2 :: [(Maybe Int, [(Maybe Int, [V0])])] = fmap (fmap mkStep) step1
-    sequence_ $ print <$> step2
+    -- putStrLn "\nSTEP-2"
+    -- let step2 :: [(Maybe Int, [(Maybe Int, [V0])])] = fmap (fmap mkStep) step1
+    --sequence_ $ print <$> step2
 
     putStrLn "\nV-2"
+    let v2s = V2s $ mkVerStep2 v1s
+    putStrLn . render $ pPrint v2s
 
-    putStrLn "\nSTEP-3"
-    let step3 :: [(Maybe Int, [(Maybe Int, [(Maybe Int, [V0])])])] = (fmap . fmap . fmap) (fmap mkStep) step2
-    sequence_ $ print <$> step3
-    putStrLn "\nSTEP-4"
-    let step4 = (fmap . fmap . fmap . fmap . fmap) (fmap mkStep) step3
-    sequence_ $ print <$> step4
+    -- putStrLn "\nSTEP-3"
+    -- let step3 :: [(Maybe Int, [(Maybe Int, [(Maybe Int, [V0])])])] = (fmap . fmap . fmap) (fmap mkStep) step2
+    --sequence_ $ print <$> step3
+
+    -- putStrLn "\nSTEP-4"
+    -- let step4 = (fmap . fmap . fmap . fmap . fmap) (fmap mkStep) step3
+    -- sequence_ $ print <$> step4
 
 -- >>> mkStep [[0,4],[0,41],[0,42]]
 -- [(Just 0,[[4],[41],[42]])]
@@ -136,12 +140,18 @@ assoc xs =
         (vs, ws) = unzip [(x, ys) | (Just x, ys) <- xs]
 
 
-mkVerStep :: [V0] -> [V1]
-mkVerStep =
+mkVerStep :: V0s -> [V1]
+mkVerStep (V0s vs)=
     (\xs ->
         [ V1 i [V0s ys] | (i@(Just _), ys) <- xs]
         )
-    . mkStep
+    $ mkStep vs
+
+mkVerStep2 :: V1s -> [V2]
+mkVerStep2 (V1s vs) =
+    [ V2 v1 $ concat (mkVerStep <$> w1)
+    | V1 v1 w1 <- vs
+    ]
 
 showVer :: [Int] -> ShowS
 showVer = showString . showVersion . makeVersion
