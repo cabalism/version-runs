@@ -12,10 +12,10 @@ import Prelude hiding ((<>))
 import Data.Version
 import Data.Coerce
 import Text.ParserCombinators.ReadP
-import Data.List (unfoldr, dropWhileEnd, sort, groupBy, isPrefixOf, intercalate)
+import Data.List (unfoldr, dropWhileEnd, sort, groupBy, isPrefixOf, intercalate, partition)
 import Data.Char (isSpace)
 import Data.Function (on)
-import Data.Maybe (listToMaybe, catMaybes)
+import Data.Maybe (listToMaybe, catMaybes, isNothing)
 import Data.Functor ((<&>))
 import GHC.Read (list)
 import Text.PrettyPrint.HughesPJClass
@@ -79,6 +79,7 @@ parseVer s = case [ v | (v,"") <- readP_to_S parseVersion s ] of
 main :: IO ()
 main = do
     let ps = unintersperse ',' vsPandoc
+    -- let ps = unintersperse ',' vsCabal
     let vs  = parseVer . trim <$> ps
     -- print ps
     -- sequence_ $ print . showVersion <$> vs
@@ -107,9 +108,13 @@ main = do
     -- let step2 :: [(Maybe Int, [(Maybe Int, [V0])])] = fmap (fmap mkStep) step1
     --sequence_ $ print <$> step2
 
-    putStrLn "\nV-2"
-    let v2s = V2s $ mkVerStep2 v1s
-    putStrLn . render $ pPrint v2s
+    putStrLn "\nV-2a"
+    let v2as = V2s $ mkVerStep2a v1s
+    putStrLn . render $ pPrint v2as
+
+    putStrLn "\nV-2b"
+    let v2bs = V2s $ mkVerStep2b v1s
+    putStrLn . render $ pPrint v2bs
 
     -- putStrLn "\nSTEP-3"
     -- let step3 :: [(Maybe Int, [(Maybe Int, [(Maybe Int, [V0])])])] = (fmap . fmap . fmap) (fmap mkStep) step2
@@ -147,10 +152,18 @@ mkVerStep (V0s vs)=
         )
     $ mkStep vs
 
-mkVerStep2 :: V1s -> [V2]
-mkVerStep2 (V1s vs) =
+mkVerStep2a :: V1s -> [V2]
+mkVerStep2a (V1s vs) =
     [ V2 v1 $ concat (mkVerStep <$> w1)
     | V1 v1 w1 <- vs
+    ]
+
+mkVerStep2b :: V1s -> [V2]
+mkVerStep2b (V1s vs) =
+    [ V2 v1 $ shallowV1 ++ concat (mkVerStep <$> deep)
+    | V1 v1 w1 <- vs
+    , let (shallowV0, deep) = partition (\(V0s xs) -> length xs <= 1) w1
+    , let shallowV1 = [V1 Nothing [v0s] | v0s <- shallowV0]
     ]
 
 showVer :: [Int] -> ShowS
@@ -199,8 +212,10 @@ instance Pretty V0s where
 -- >>> pPrint $ V1 (Just 0) [V0s [[4],[41],[42]]]
 -- 0.[4, 41, 42]
 instance Pretty V1 where
-    pPrint (V1 v0 []) = maybe empty (text . show) v0
-    pPrint (V1 v0 vs) = maybe empty (\v -> text (show v) <> text ".") v0 <> pPrint vs
+    pPrint (V1 Nothing []) = empty
+    pPrint (V1 (Just v0) []) = text $ show v0
+    pPrint (V1 Nothing vs) = pPrint vs
+    pPrint (V1 (Just v0) vs) = text (show v0) <> text "." <> pPrint vs
 
 -- >>> pPrint $ V1s [V1 (Just 0) [V0s [[4],[41],[42]]]]
 -- 0.[4, 41, 42]
@@ -208,7 +223,20 @@ instance Pretty V1s where
     pPrint (V1s []) = empty
     pPrint (V1s [V1 x []]) = pPrint x
     pPrint (V1s [x]) = pPrint x
-    pPrint (V1s (x:xs)) = pPrint x <> comma <+> pPrint (V1s xs)
+    pPrint (V1s v1s) =
+        pShallow
+        <> colon
+        <+> pDeep
+        where
+            (shallow, deep) = partition (\(V1 v _) -> isNothing v) v1s
+            shallow' = concat [xs | V1 Nothing v0s <- shallow, V0s xs <- v0s]
+            pShallow = case shallow' of
+                [] -> empty
+                xs -> pPrint xs
+            pDeep = case deep of
+                [] -> empty
+                [x] -> pPrint x
+                (x:xs) -> pPrint x <> comma <+> pPrint (V1s xs)
 
 -- >>> mkV2 (Just 0,[(Just 4,[[]]),(Just 41,[[]]),(Just 42,[[]])])
 -- V2 {v2 = Just 0, w2 = [V1 {v1 = Just 4, w1 = [V0s []]},V1 {v1 = Just 41, w1 = [V0s []]},V1 {v1 = Just 42, w1 = [V0s []]}]}
@@ -219,12 +247,18 @@ instance Pretty V1s where
 -- >>> pPrint $ V2 (Just 0) [V1 (Just 4) [V0s []], V1 (Just 41) [V0s []], V1 (Just 42) [V0s []]]
 -- 0.4.[], 41.[], 42.[]
 instance Pretty V2 where
-    pPrint (V2 v []) = maybe empty (text . show) v
-    pPrint (V2 v [V1 v' []]) = maybe empty (text . show) v <> text "." <> pPrint v'
-    pPrint (V2 v vs) = maybe empty (\ver -> text (show ver) <> text ".") v <> pPrint (V1s vs)
+    pPrint (V2 Nothing []) = empty
+    pPrint (V2 (Just v) []) = text $ show v
+    pPrint (V2 Nothing vs) = pPrint (V1s vs)
+    pPrint (V2 (Just v) [V1 v' []]) = text (show v) <> text "." <> pPrint v'
+    pPrint (V2 (Just v) vs) = text (show v) <> text "." <> pPrint (V1s vs)
 
 instance Pretty V2s where
     pPrint (V2s []) = empty
     pPrint (V2s [V2 x []]) = pPrint x
     pPrint (V2s [x]) = pPrint x
-    pPrint (V2s (x:xs)) = pPrint x <> comma <+> pPrint (V2s xs)
+    pPrint (V2s v2s) = text "STOP"
+        -- comma <+> pPrint shallow' <> colon <+> pPrint (V2s deep)
+        -- where
+        --     (shallow, deep) = partition (\(V2 v _) -> isNothing v) v2s
+        --     shallow' = concat [v0s | V2 Nothing v0s <- shallow]
