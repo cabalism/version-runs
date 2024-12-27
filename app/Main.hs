@@ -225,17 +225,16 @@ instance Pretty V1s where
     pPrint (V1s [x]) = pPrint x
     pPrint (V1s v1s) =
         pShallow
-        <> colon
-        <+> pDeep
+        <> pDeep
         where
             (shallow, deep) = partition (\(V1 v _) -> isNothing v) v1s
             shallow' = concat [xs | V1 Nothing v0s <- shallow, V0s xs <- v0s]
             pShallow = case shallow' of
                 [] -> empty
-                xs -> pPrint xs
+                xs -> text "<<<" <+> pPrint xs <+> text ">>>"
             pDeep = case deep of
                 [] -> empty
-                [x] -> pPrint x
+                [x] -> text "!!!" <+> pPrint x <+> text "!!!"
                 (x:xs) -> pPrint x <> comma <+> pPrint (V1s xs)
 
 -- >>> mkV2 (Just 0,[(Just 4,[[]]),(Just 41,[[]]),(Just 42,[[]])])
